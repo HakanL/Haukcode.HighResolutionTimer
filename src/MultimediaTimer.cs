@@ -12,26 +12,26 @@ namespace Haukcode.HighResolutionTimer
     /// <summary>
     /// A timer based on the multimedia timer API with 1ms precision.
     /// </summary>
-    internal class WindowsTimer : ITimer, IDisposable
+    internal class MultimediaTimer : ITimer, IDisposable
     {
+        private const int EventTypeSingle = 0;
         private const int EventTypePeriodic = 1;
         private bool disposed = false;
-        private int interval;
-        private int resolution;
+        private int interval, resolution;
         private volatile uint timerId;
         private readonly ManualResetEvent triggerEvent = new ManualResetEvent(false);
 
         // Hold the timer callback to prevent garbage collection.
         private readonly MultimediaTimerCallback callback;
 
-        public WindowsTimer()
+        public MultimediaTimer()
         {
             this.callback = new MultimediaTimerCallback(TimerCallbackMethod);
             Resolution = 5;
             Interval = 10;
         }
 
-        ~WindowsTimer()
+        ~MultimediaTimer()
         {
             Dispose(false);
         }
@@ -156,9 +156,6 @@ namespace Haukcode.HighResolutionTimer
 
         public void SetPeriod(int periodMS)
         {
-            if (IsRunning)
-                throw new InvalidOperationException("Timer is already running");
-
             Interval = periodMS;
         }
 

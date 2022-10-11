@@ -7,15 +7,17 @@
     <Authors>Hakan Lindestaf</Authors>
     <Company />
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Copyright>© Copyright 2020 Hakan Lindestaf</Copyright>
+    <Copyright>© Copyright 2022 Hakan Lindestaf</Copyright>
     <PackageProjectUrl>https://github.com/HakanL/Haukcode.HighResolutionTimer</PackageProjectUrl>
     <RepositoryUrl>https://github.com/HakanL/Haukcode.HighResolutionTimer</RepositoryUrl>
     <RepositoryType></RepositoryType>
     <PackageTags>csharp c# timer high-resolution</PackageTags>
-    <PackageReleaseNotes>1.0.0 - Initial release</PackageReleaseNotes>
+    <PackageReleaseNotes>1.1.0 - Support for Linux64
+1.0.0 - Initial release</PackageReleaseNotes>
     <PackageId>Haukcode.HighResolutionTimer</PackageId>
     <Description>High Resolution Timer for .NET Core. Uses Multimedia Timer on Windows and timerfd on Linux.</Description>
     <Title>High Resolution Timer for .NET Core</Title>
+    <Version>1.1.0</Version>
   </PropertyGroup>
 
 </Project>

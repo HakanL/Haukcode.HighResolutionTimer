@@ -6,22 +6,19 @@ using System.Threading.Tasks;
 
 namespace Haukcode.HighResolutionTimer
 {
-    internal class LinuxTimer : ITimer, IDisposable
+    internal class LinuxTimer64 : ITimer, IDisposable
     {
         private readonly int fileDescriptor;
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
         private readonly ManualResetEvent triggerEvent = new ManualResetEvent(false);
         private bool isRunning;
 
-        public LinuxTimer()
+        public LinuxTimer64()
         {
-            this.fileDescriptor = Interop.timerfd_create(Interop.ClockIds.CLOCK_MONOTONIC, 0);
+            this.fileDescriptor = Interop64.timerfd_create(Interop64.ClockIds.CLOCK_MONOTONIC, 0);
 
             if (this.fileDescriptor == -1)
                 throw new Exception($"Unable to create timer, errno = {Marshal.GetLastWin32Error()}");
-            {
-
-            }
 
             ThreadPool.QueueUserWorkItem(Scheduler);
         }
@@ -52,22 +49,21 @@ namespace Haukcode.HighResolutionTimer
         {
             uint sec = period / 1000000;
             uint ns = (period - (sec * 1000000)) * 1000;
-            var itval = new Interop.itimerspec
+            var itval = new Interop64.itimerspec64
             {
-                it_interval = new Interop.timespec
+                it_interval = new Interop64.timespec64
                 {
                     tv_sec = sec,
                     tv_nsec = ns
                 },
-                it_value = new Interop.timespec
+                it_value = new Interop64.timespec64
                 {
-
                     tv_sec = sec,
                     tv_nsec = ns
                 }
             };
 
-            int ret = Interop.timerfd_settime(this.fileDescriptor, 0, itval, null);
+            int ret = Interop64.timerfd_settime(this.fileDescriptor, 0, itval, null);
             if (ret != 0)
                 throw new Exception($"Error from timerfd_settime = {Marshal.GetLastWin32Error()}");
         }
@@ -75,25 +71,32 @@ namespace Haukcode.HighResolutionTimer
         private long Wait()
         {
             // Wait for the next timer event. If we have missed any the number is written to "missed"
-            byte[] buf = new byte[16];
+            byte[] buf = new byte[8];
             var handle = GCHandle.Alloc(buf, GCHandleType.Pinned);
-            IntPtr pointer = handle.AddrOfPinnedObject();
-            int ret = Interop.read(this.fileDescriptor, pointer, buf.Length);
-            // ret = bytes read
-            long missed = Marshal.ReadInt64(pointer);
-            handle.Free();
+            try
+            {
+                IntPtr pointer = handle.AddrOfPinnedObject();
+                
+                long ret = Interop64.read(this.fileDescriptor, pointer, 8);
+                // ret = bytes read
+                if (ret < 0)
+                    throw new Exception($"Error in read = {Marshal.GetLastWin32Error()}");
 
-            if (ret < 0)
-                throw new Exception($"Error in read = {Marshal.GetLastWin32Error()}");
+                long missed = Marshal.ReadInt64(pointer);
 
-            return missed;
+                return missed;
+            }
+            finally
+            {
+                handle.Free();
+            }
         }
 
         public void Dispose()
         {
             this.cts.Cancel();
 
-            Interop.close(this.fileDescriptor);
+            Interop64.close(this.fileDescriptor);
 
             // Release trigger
             this.triggerEvent.Set();

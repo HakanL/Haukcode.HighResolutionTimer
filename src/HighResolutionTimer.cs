@@ -15,9 +15,14 @@ namespace Haukcode.HighResolutionTimer
         public HighResolutionTimer()
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                this.timer = new WindowsTimer();
+                this.timer = new MultimediaTimer();
             else
-                this.timer = new LinuxTimer();
+            {
+                if (IntPtr.Size == 8)
+                    this.timer = new LinuxTimer64();
+                else
+                    this.timer = new LinuxTimer();
+            }
         }
 
         /// <summary>
