@@ -39,6 +39,9 @@ namespace Haukcode.HighResolutionTimer
         /// <param name="periodMS">Period in MS</param>
         public void SetPeriod(int periodMS)
         {
+            if (periodMS < 1 || periodMS > TimeSpan.FromMinutes(15).TotalMilliseconds)
+                throw new ArgumentOutOfRangeException(nameof(periodMS), "Period cannot be greater than 15 minutes and has to be greater than 0 mS");
+
             this.timer.SetPeriod(periodMS);
         }
 
