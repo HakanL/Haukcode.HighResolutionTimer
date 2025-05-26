@@ -43,6 +43,8 @@ namespace Haukcode.HighResolutionTimer
                 if (this.isRunning)
                     this.triggerEvent.Set();
             }
+
+            Interop64.close(this.fileDescriptor);
         }
 
         private void SetFrequency(uint period)
@@ -95,8 +97,6 @@ namespace Haukcode.HighResolutionTimer
         public void Dispose()
         {
             this.cts.Cancel();
-
-            Interop64.close(this.fileDescriptor);
 
             // Release trigger
             this.triggerEvent.Set();

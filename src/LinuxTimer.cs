@@ -19,9 +19,6 @@ namespace Haukcode.HighResolutionTimer
 
             if (this.fileDescriptor == -1)
                 throw new Exception($"Unable to create timer, errno = {Marshal.GetLastWin32Error()}");
-            {
-
-            }
 
             ThreadPool.QueueUserWorkItem(Scheduler);
         }
@@ -46,6 +43,8 @@ namespace Haukcode.HighResolutionTimer
                 if (this.isRunning)
                     this.triggerEvent.Set();
             }
+
+            Interop.close(this.fileDescriptor);
         }
 
         private void SetFrequency(uint period)
@@ -92,8 +91,6 @@ namespace Haukcode.HighResolutionTimer
         public void Dispose()
         {
             this.cts.Cancel();
-
-            Interop.close(this.fileDescriptor);
 
             // Release trigger
             this.triggerEvent.Set();
