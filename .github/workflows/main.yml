@@ -42,13 +42,13 @@ jobs:
       with:
         dotnet-version: 9.0.100
     - name: Install dependencies
-      run: dotnet restore Haukcode.HighResolutionTimer.csproj /p:Configuration=Release
+      run: dotnet restore HighResolutionTimer.csproj /p:Configuration=Release
       env:
         DOTNET_CLI_TELEMETRY_OPTOUT: 1
     - name: Build
-      run: dotnet build Haukcode.HighResolutionTimer.csproj --configuration Release --no-restore /p:Version="${PACKAGE_VERSION}"
+      run: dotnet build HighResolutionTimer.csproj --configuration Release --no-restore /p:Version="${PACKAGE_VERSION}"
     - name: Test
-      run: dotnet test Haukcode.HighResolutionTimer.csproj --no-restore --verbosity normal
+      run: dotnet test HighResolutionTimer.csproj --no-restore --verbosity normal
 
     ## Publish and Tag
     - name: Publish NuGet
