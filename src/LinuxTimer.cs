@@ -29,9 +29,9 @@ namespace Haukcode.HighResolutionTimer
             this.triggerEvent.Reset();
         }
 
-        public void SetPeriod(int periodMS)
+        public void SetPeriod(double periodMS)
         {
-            SetFrequency((uint)periodMS * 1_000);
+            SetFrequency((uint)(periodMS * 1_000));
         }
 
         private void Scheduler(object state)

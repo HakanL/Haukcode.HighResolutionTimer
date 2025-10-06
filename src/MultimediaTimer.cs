@@ -17,7 +17,8 @@ namespace Haukcode.HighResolutionTimer
         private const int EventTypeSingle = 0;
         private const int EventTypePeriodic = 1;
         private bool disposed = false;
-        private int interval, resolution;
+        private int interval;
+        private int resolution;
         private volatile uint timerId;
         private readonly ManualResetEvent triggerEvent = new ManualResetEvent(false);
 
@@ -154,9 +155,9 @@ namespace Haukcode.HighResolutionTimer
             }
         }
 
-        public void SetPeriod(int periodMS)
+        public void SetPeriod(double periodMS)
         {
-            Interval = periodMS;
+            Interval = (int)periodMS;
         }
 
         public void WaitForTrigger()

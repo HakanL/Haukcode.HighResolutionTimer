@@ -4,7 +4,7 @@ namespace Haukcode.HighResolutionTimer
 {
     public interface ITimer : IDisposable
     {
-        void SetPeriod(int periodMS);
+        void SetPeriod(double periodMS);
 
         void WaitForTrigger();
 

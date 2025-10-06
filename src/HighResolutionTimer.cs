@@ -37,7 +37,7 @@ namespace Haukcode.HighResolutionTimer
         /// Set the frequency of the timer in milliseconds. For example 25 ms would generate a 40 Hz timer (1000/25=40)
         /// </summary>
         /// <param name="periodMS">Period in MS</param>
-        public void SetPeriod(int periodMS)
+        public void SetPeriod(double periodMS)
         {
             if (periodMS < 1 || periodMS > TimeSpan.FromMinutes(15).TotalMilliseconds)
                 throw new ArgumentOutOfRangeException(nameof(periodMS), "Period cannot be greater than 15 minutes and has to be greater than 0 mS");
