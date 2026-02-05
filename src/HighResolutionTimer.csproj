@@ -19,6 +19,11 @@
     <Description>High Resolution Timer for .NET Core. Uses Multimedia Timer on Windows and timerfd on Linux.</Description>
     <Title>High Resolution Timer for .NET Core</Title>
     <Version>1.2.0</Version>
+    <PackageReadmeFile>README_NUGET.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README_NUGET.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
 </Project>
