@@ -26,7 +26,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 9.0.x
+        dotnet-version: 10.0.x
     - name: Restore dependencies
       run: dotnet restore ../tests/HighResolutionTimer.Tests/HighResolutionTimer.Tests.csproj
       env:
@@ -66,7 +66,7 @@ jobs:
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 9.0.x
+        dotnet-version: 10.0.x
     - name: Install dependencies
       run: dotnet restore HighResolutionTimer.csproj /p:Configuration=Release
       env:
