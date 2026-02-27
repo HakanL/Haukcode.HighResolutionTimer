@@ -12,13 +12,14 @@
     <RepositoryUrl>https://github.com/HakanL/Haukcode.HighResolutionTimer</RepositoryUrl>
     <RepositoryType></RepositoryType>
     <PackageTags>csharp c# timer high-resolution</PackageTags>
-    <PackageReleaseNotes>1.2.0 - Support for floating period on Linux
+    <PackageReleaseNotes>1.3.0 - Support for macOS (Arm64 and x64)
+1.2.0 - Support for floating period on Linux
 1.1.0 - Support for Linux64
 1.0.0 - Initial release</PackageReleaseNotes>
     <PackageId>Haukcode.HighResolutionTimer</PackageId>
-    <Description>High Resolution Timer for .NET Core. Uses Multimedia Timer on Windows and timerfd on Linux.</Description>
+    <Description>High Resolution Timer for .NET Core. Uses Multimedia Timer on Windows, timerfd on Linux, and kqueue on macOS.</Description>
     <Title>High Resolution Timer for .NET Core</Title>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <PackageReadmeFile>README_NUGET.md</PackageReadmeFile>
   </PropertyGroup>
 

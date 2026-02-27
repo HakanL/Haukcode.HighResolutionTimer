@@ -16,6 +16,8 @@ namespace Haukcode.HighResolutionTimer
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 this.timer = new MultimediaTimer();
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                this.timer = new MacOSTimer();
             else
             {
                 if (IntPtr.Size == 8)
