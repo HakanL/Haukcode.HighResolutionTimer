@@ -1,6 +1,6 @@
 # Haukcode.HighResolutionTimer
 
-A cross-platform, high-resolution timer for .NET Standard 2.0+ with precise timing for Windows and Linux.
+A cross-platform, high-resolution timer for .NET Standard 2.0+ with precise timing for Windows, Linux, and macOS.
 
 ## Installation
 
@@ -31,8 +31,8 @@ using (var timer = new HighResolutionTimer())
 
 ## Key Features
 
-- **High Precision**: ~1ms on Windows, microsecond on Linux
-- **Cross-Platform**: Automatic Windows/Linux detection
+- **High Precision**: ~1ms on Windows, microsecond on Linux and macOS
+- **Cross-Platform**: Automatic Windows/Linux/macOS detection
 - **Simple API**: Easy to use with minimal setup
 - **Period Range**: 0 to 15 minutes (900,000 ms)
 
@@ -48,6 +48,7 @@ using (var timer = new HighResolutionTimer())
 
 - **Windows**: Multimedia Timer API (~1ms precision)
 - **Linux**: timerfd API (microsecond precision)
+- **macOS**: kqueue/kevent API (microsecond precision)
 - **Compatibility**: .NET Core 2.0+, .NET 5+, .NET Framework 4.6.1+
 
 ## Full Documentation
