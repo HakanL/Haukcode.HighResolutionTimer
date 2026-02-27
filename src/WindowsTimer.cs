@@ -6,21 +6,33 @@ using System.Threading;
 namespace Haukcode.HighResolutionTimer
 {
     /// <summary>
-    /// A timer based on the Windows Timer Queue API with 1ms precision.
+    /// A timer based on the Windows Waitable Timer API with sub-millisecond precision.
+    /// Uses SetWaitableTimer with a 100ns-resolution due time and manual re-arm in a
+    /// scheduler thread, matching the timerfd approach used on Linux.
     /// </summary>
     internal class WindowsTimer : ITimer, IDisposable
     {
         private bool disposed = false;
-        private IntPtr timerHandle = IntPtr.Zero;
-        private uint periodMs;
+        private volatile bool schedulerHandleClosed = false;
+        private double periodMs;
+        private bool isRunning;
+        private readonly IntPtr timerHandle;
+        private readonly CancellationTokenSource cts = new CancellationTokenSource();
         private readonly ManualResetEvent triggerEvent = new ManualResetEvent(false);
-
-        // Hold the timer callback to prevent garbage collection.
-        private readonly TimerQueueCallback callback;
 
         public WindowsTimer()
         {
-            this.callback = new TimerQueueCallback(TimerCallbackMethod);
+            // false = auto-reset: timer resets to non-signaled automatically after WaitForSingleObject returns
+            this.timerHandle = WindowsNativeMethods.CreateWaitableTimer(
+                IntPtr.Zero, false, IntPtr.Zero);
+
+            if (this.timerHandle == IntPtr.Zero)
+            {
+                int error = Marshal.GetLastWin32Error();
+                throw new Win32Exception(error);
+            }
+
+            ThreadPool.QueueUserWorkItem(Scheduler);
         }
 
         ~WindowsTimer()
@@ -28,66 +40,65 @@ namespace Haukcode.HighResolutionTimer
             Dispose(false);
         }
 
-        private bool IsRunning => this.timerHandle != IntPtr.Zero;
-
         public void SetPeriod(double periodMS)
         {
-            this.periodMs = (uint)periodMS;
+            this.periodMs = periodMS;
+        }
+
+        private void Scheduler(object state)
+        {
+            while (!this.cts.IsCancellationRequested)
+            {
+                double period = this.periodMs;
+                if (period <= 0)
+                {
+                    Thread.Sleep(1);
+                    continue;
+                }
+
+                // Convert ms to 100ns intervals; negative value = relative time from now.
+                // This gives sub-millisecond precision (e.g. 16.67ms = -166700 units).
+                long dueTime = -(long)(period * 10_000);
+
+                if (!WindowsNativeMethods.SetWaitableTimer(
+                    this.timerHandle, ref dueTime, 0,
+                    IntPtr.Zero, IntPtr.Zero, false))
+                {
+                    break;
+                }
+
+                uint result = WindowsNativeMethods.WaitForSingleObject(
+                    this.timerHandle, WindowsNativeMethods.INFINITE);
+
+                if (result != 0)
+                    break;
+
+                if (this.isRunning && !this.cts.IsCancellationRequested)
+                    this.triggerEvent.Set();
+            }
+
+            this.schedulerHandleClosed = true;
+            WindowsNativeMethods.CloseHandle(this.timerHandle);
+            this.cts.Dispose();
+            this.triggerEvent.Dispose();
         }
 
         public void Start()
         {
             CheckDisposed();
-
-            if (IsRunning)
-                throw new InvalidOperationException("Timer is already running");
-
-            bool success = WindowsNativeMethods.CreateTimerQueueTimer(
-                out this.timerHandle,
-                IntPtr.Zero,    // use default timer queue
-                this.callback,
-                IntPtr.Zero,    // no parameter
-                this.periodMs,  // due time
-                this.periodMs,  // period
-                0);             // WT_EXECUTEDEFAULT
-
-            if (!success)
-            {
-                int error = Marshal.GetLastWin32Error();
-                this.timerHandle = IntPtr.Zero;
-                throw new Win32Exception(error);
-            }
+            this.isRunning = true;
         }
 
         public void Stop()
         {
             CheckDisposed();
-
-            if (!IsRunning)
-                throw new InvalidOperationException("Timer has not been started");
-
-            StopInternal();
+            this.isRunning = false;
         }
 
-        private void StopInternal()
+        public void WaitForTrigger()
         {
-            if (this.timerHandle != IntPtr.Zero)
-            {
-                if (!WindowsNativeMethods.DeleteTimerQueueTimer(IntPtr.Zero, this.timerHandle, IntPtr.Zero))
-                {
-                    // ERROR_IO_PENDING (997) is the expected result when CompletionEvent is NULL
-                    // and callbacks are still running; the timer will be deleted once they complete.
-                    // Any other error code indicates an unexpected failure.
-                    _ = Marshal.GetLastWin32Error();
-                }
-                this.timerHandle = IntPtr.Zero;
-                this.triggerEvent.Set();
-            }
-        }
-
-        private void TimerCallbackMethod(IntPtr parameter, bool timerOrWaitFired)
-        {
-            this.triggerEvent.Set();
+            this.triggerEvent.WaitOne();
+            this.triggerEvent.Reset();
         }
 
         private void CheckDisposed()
@@ -102,14 +113,21 @@ namespace Haukcode.HighResolutionTimer
                 return;
 
             this.disposed = true;
-            if (IsRunning)
+            this.isRunning = false;
+            this.cts.Cancel();
+
+            // Signal the timer immediately to unblock WaitForSingleObject in the scheduler thread.
+            // Guard against the handle already being closed by the scheduler thread.
+            if (!this.schedulerHandleClosed)
             {
-                StopInternal();
+                long dueTime = -1; // 100ns = fires almost immediately
+                WindowsNativeMethods.SetWaitableTimer(
+                    this.timerHandle, ref dueTime, 0,
+                    IntPtr.Zero, IntPtr.Zero, false);
             }
 
             if (disposing)
             {
-                this.triggerEvent.Dispose();
                 GC.SuppressFinalize(this);
             }
         }
@@ -118,33 +136,31 @@ namespace Haukcode.HighResolutionTimer
         {
             Dispose(true);
         }
-
-        public void WaitForTrigger()
-        {
-            this.triggerEvent.WaitOne();
-            this.triggerEvent.Reset();
-        }
     }
-
-    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    internal delegate void TimerQueueCallback(IntPtr parameter, bool timerOrWaitFired);
 
     internal static class WindowsNativeMethods
     {
-        [DllImport("kernel32.dll", SetLastError = true)]
-        internal static extern bool CreateTimerQueueTimer(
-            out IntPtr phNewTimer,
-            IntPtr TimerQueue,
-            TimerQueueCallback Callback,
-            IntPtr Parameter,
-            uint DueTime,
-            uint Period,
-            uint Flags);
+        internal const uint INFINITE = 0xFFFFFFFF;
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        internal static extern bool DeleteTimerQueueTimer(
-            IntPtr TimerQueue,
-            IntPtr Timer,
-            IntPtr CompletionEvent);
+        internal static extern IntPtr CreateWaitableTimer(
+            IntPtr lpTimerAttributes,
+            bool bManualReset,
+            IntPtr lpTimerName);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        internal static extern bool SetWaitableTimer(
+            IntPtr hTimer,
+            ref long lpDueTime,
+            int lPeriod,
+            IntPtr pfnCompletionRoutine,
+            IntPtr lpArgToCompletionRoutine,
+            bool fResume);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        internal static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        internal static extern bool CloseHandle(IntPtr hObject);
     }
 }

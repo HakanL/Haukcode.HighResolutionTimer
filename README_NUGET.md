@@ -31,7 +31,7 @@ using (var timer = new HighResolutionTimer())
 
 ## Key Features
 
-- **High Precision**: ~1ms on Windows, microsecond on Linux and macOS
+- **High Precision**: Sub-millisecond on all platforms (Windows, Linux, macOS)
 - **Cross-Platform**: Automatic Windows/Linux/macOS detection
 - **Simple API**: Easy to use with minimal setup
 - **Period Range**: 0 to 15 minutes (900,000 ms)
@@ -46,7 +46,7 @@ using (var timer = new HighResolutionTimer())
 
 ## Platform Support
 
-- **Windows**: Timer Queue Timer API (~1ms precision)
+- **Windows**: Waitable Timer API (sub-millisecond precision)
 - **Linux**: timerfd API (microsecond precision)
 - **macOS**: kqueue/kevent API (microsecond precision)
 - **Compatibility**: .NET Core 2.0+, .NET 5+, .NET Framework 4.6.1+
