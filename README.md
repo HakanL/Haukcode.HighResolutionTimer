@@ -1,6 +1,6 @@
 # Haukcode.HighResolutionTimer [![NuGet Version](http://img.shields.io/nuget/v/Haukcode.HighResolutionTimer.svg?style=flat)](https://www.nuget.org/packages/Haukcode.HighResolutionTimer/)
 
-A high-resolution, cross-platform timer for .NET Standard 2.0+ applications that provides precise timing capabilities for Windows and Linux.
+A high-resolution, cross-platform timer for .NET Standard 2.0+ applications that provides precise timing capabilities for Windows, Linux, and macOS.
 
 ## Overview
 
@@ -8,14 +8,15 @@ A high-resolution, cross-platform timer for .NET Standard 2.0+ applications that
 
 - **Windows**: Uses Multimedia Timer API (`timeSetEvent`) with ~1ms precision
 - **Linux**: Uses `timerfd` API with microsecond precision
+- **macOS**: Uses `kqueue`/`kevent` API with microsecond precision
 - **Cross-platform**: Automatic platform detection and selection
 
 This library is ideal for applications requiring accurate periodic execution, such as real-time data processing, game loops, multimedia applications, or any scenario where `System.Threading.Timer` doesn't provide sufficient precision.
 
 ## Features
 
-- ✅ Cross-platform support (Windows and Linux)
-- ✅ High precision timing (1ms on Windows, microsecond on Linux)
+- ✅ Cross-platform support (Windows, Linux, and macOS)
+- ✅ High precision timing (1ms on Windows, microsecond on Linux and macOS)
 - ✅ Simple, intuitive API
 - ✅ Automatic platform detection
 - ✅ Support for both 32-bit and 64-bit Linux
@@ -274,6 +275,12 @@ Releases all resources used by the timer. Automatically stops the timer if runni
 - Separate implementations for 32-bit and 64-bit systems
 - Requires Linux kernel 2.6.25 or later (timerfd support)
 
+### macOS Implementation
+
+- Uses `kqueue`/`kevent` system calls with `NOTE_USECONDS` flag
+- Precision: Microsecond level
+- Works on all macOS versions that support .NET Standard 2.0
+
 ## Performance Considerations
 
 ### Precision vs. CPU Usage
@@ -327,12 +334,11 @@ using (var timer = new HighResolutionTimer())
   - .NET Framework 4.6.1+
   - Mono 5.4+
   - Xamarin
-- Windows or Linux operating system
+- Windows or Linux or macOS operating system
 
 ## Limitations
 
 - Period must be between 0 and 15 minutes (900,000 ms)
-- Not supported on macOS (contributions welcome!)
 - Timer precision depends on OS and hardware capabilities
 - High-frequency timers (< 5ms) may impact overall system performance
 
@@ -383,6 +389,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Uses Windows Multimedia Timer API for high-resolution timing on Windows
 - Uses Linux timerfd API for precise timing on Linux
+- Uses macOS kqueue/kevent API for precise timing on macOS
 - Inspired by the need for cross-platform high-resolution timing in .NET applications
 
 ## Support
