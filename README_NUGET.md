@@ -46,7 +46,7 @@ using (var timer = new HighResolutionTimer())
 
 ## Platform Support
 
-- **Windows**: Multimedia Timer API (~1ms precision)
+- **Windows**: Timer Queue Timer API (~1ms precision)
 - **Linux**: timerfd API (microsecond precision)
 - **macOS**: kqueue/kevent API (microsecond precision)
 - **Compatibility**: .NET Core 2.0+, .NET 5+, .NET Framework 4.6.1+
