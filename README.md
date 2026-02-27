@@ -6,7 +6,7 @@ A high-resolution, cross-platform timer for .NET Standard 2.0+ applications that
 
 `Haukcode.HighResolutionTimer` is a lightweight library that abstracts platform-specific high-resolution timer implementations to provide consistent, precise timing across different operating systems:
 
-- **Windows**: Uses Timer Queue Timer API (`CreateTimerQueueTimer`) with ~1ms precision
+- **Windows**: Uses Waitable Timer API (`SetWaitableTimer`) with sub-millisecond precision
 - **Linux**: Uses `timerfd` API with microsecond precision
 - **macOS**: Uses `kqueue`/`kevent` API with microsecond precision
 - **Cross-platform**: Automatic platform detection and selection
@@ -16,7 +16,7 @@ This library is ideal for applications requiring accurate periodic execution, su
 ## Features
 
 - ✅ Cross-platform support (Windows, Linux, and macOS)
-- ✅ High precision timing (1ms on Windows, microsecond on Linux and macOS)
+- ✅ High precision timing (sub-millisecond on all platforms)
 - ✅ Simple, intuitive API
 - ✅ Automatic platform detection
 - ✅ Support for both 32-bit and 64-bit Linux
@@ -263,8 +263,9 @@ Releases all resources used by the timer. Automatically stops the timer if runni
 
 ### Windows Implementation
 
-- Uses Windows Timer Queue Timer API (`kernel32.dll`)
-- Typical precision: ~1ms
+- Uses Windows Waitable Timer API (`kernel32.dll`)
+- Sub-millisecond precision: period stored as 100-nanosecond intervals, so fractional values like 16.67ms work correctly
+- Scheduler thread manually re-arms the timer each period, matching the Linux/macOS approach
 - Works on all Windows versions that support .NET Standard 2.0
 
 ### Linux Implementation
