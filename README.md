@@ -42,7 +42,7 @@ Install-Package Haukcode.HighResolutionTimer
 Or add directly to your `.csproj` file:
 
 ```xml
-<PackageReference Include="Haukcode.HighResolutionTimer" Version="1.2.0" />
+<PackageReference Include="Haukcode.HighResolutionTimer" Version="1.*" />
 ```
 
 ## Quick Start
@@ -398,18 +398,18 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
-### Version 1.4.0
+### Version 1.4
 - Replaced deprecated Windows Multimedia Timer API with Timer Queue Timer API (`CreateTimerQueueTimer`)
 
-### Version 1.2.0
+### Version 1.2
 - Support for floating-point period on Linux
 - Improved precision for sub-millisecond timing
 
-### Version 1.1.0
+### Version 1.1
 - Added support for Linux 64-bit
 - Separate implementation for better performance on 64-bit systems
 
-### Version 1.0.0
+### Version 1.0
 - Initial release
 - Windows support via Multimedia Timer
 - Linux support via timerfd
