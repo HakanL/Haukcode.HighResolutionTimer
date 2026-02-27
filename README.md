@@ -6,7 +6,7 @@ A high-resolution, cross-platform timer for .NET Standard 2.0+ applications that
 
 `Haukcode.HighResolutionTimer` is a lightweight library that abstracts platform-specific high-resolution timer implementations to provide consistent, precise timing across different operating systems:
 
-- **Windows**: Uses Multimedia Timer API (`timeSetEvent`) with ~1ms precision
+- **Windows**: Uses Timer Queue Timer API (`CreateTimerQueueTimer`) with ~1ms precision
 - **Linux**: Uses `timerfd` API with microsecond precision
 - **macOS**: Uses `kqueue`/`kevent` API with microsecond precision
 - **Cross-platform**: Automatic platform detection and selection
@@ -263,9 +263,8 @@ Releases all resources used by the timer. Automatically stops the timer if runni
 
 ### Windows Implementation
 
-- Uses Windows Multimedia Timer API (`winmm.dll`)
+- Uses Windows Timer Queue Timer API (`kernel32.dll`)
 - Typical precision: ~1ms
-- Resolution can be adjusted but defaults to 5ms
 - Works on all Windows versions that support .NET Standard 2.0
 
 ### Linux Implementation
@@ -286,7 +285,7 @@ Releases all resources used by the timer. Automatically stops the timer if runni
 ### Precision vs. CPU Usage
 
 - Lower period values (higher frequencies) increase CPU usage
-- On Windows, the multimedia timer affects system-wide timer resolution
+- On Windows, the Timer Queue Timer uses the default system timer resolution
 - Consider your application's actual timing requirements
 
 ### Best Practices
@@ -351,8 +350,8 @@ using (var timer = new HighResolutionTimer())
 - Check permissions if running in a restricted environment
 
 **Inconsistent timing on Windows:**
-- Other applications may affect multimedia timer resolution
-- Try adjusting the resolution value for better precision
+- Other applications may affect timer resolution
+- Consider increasing the timer period for better CPU efficiency
 
 **High CPU usage:**
 - Consider increasing the timer period
@@ -387,7 +386,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- Uses Windows Multimedia Timer API for high-resolution timing on Windows
+- Uses Windows Timer Queue Timer API for high-resolution timing on Windows
 - Uses Linux timerfd API for precise timing on Linux
 - Uses macOS kqueue/kevent API for precise timing on macOS
 - Inspired by the need for cross-platform high-resolution timing in .NET applications
@@ -398,6 +397,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **NuGet Package**: [Haukcode.HighResolutionTimer](https://www.nuget.org/packages/Haukcode.HighResolutionTimer/)
 
 ## Changelog
+
+### Version 1.4.0
+- Replaced deprecated Windows Multimedia Timer API with Timer Queue Timer API (`CreateTimerQueueTimer`)
 
 ### Version 1.2.0
 - Support for floating-point period on Linux
