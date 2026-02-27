@@ -286,7 +286,7 @@ Releases all resources used by the timer. Automatically stops the timer if runni
 ### Precision vs. CPU Usage
 
 - Lower period values (higher frequencies) increase CPU usage
-- On Windows, the Timer Queue Timer uses the default system timer resolution
+- On Windows, the Waitable Timer uses the default system timer resolution
 - Consider your application's actual timing requirements
 
 ### Best Practices
@@ -387,7 +387,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- Uses Windows Timer Queue Timer API for high-resolution timing on Windows
+- Uses Windows Waitable Timer API for high-resolution timing on Windows
 - Uses Linux timerfd API for precise timing on Linux
 - Uses macOS kqueue/kevent API for precise timing on macOS
 - Inspired by the need for cross-platform high-resolution timing in .NET applications
@@ -400,7 +400,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Changelog
 
 ### Version 1.4
-- Replaced deprecated Windows Multimedia Timer API with Timer Queue Timer API (`CreateTimerQueueTimer`)
+- Replaced deprecated Windows Multimedia Timer API with Waitable Timer API (`SetWaitableTimer`)
 
 ### Version 1.2
 - Support for floating-point period on Linux
