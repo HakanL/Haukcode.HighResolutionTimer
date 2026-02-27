@@ -84,6 +84,8 @@ namespace Haukcode.HighResolutionTimer
             }
 
             close(this.kqueueFd);
+            this.cts.Dispose();
+            this.triggerEvent.Dispose();
         }
 
         public void Dispose()
@@ -92,9 +94,6 @@ namespace Haukcode.HighResolutionTimer
 
             // Release trigger
             this.triggerEvent.Set();
-
-            this.cts.Dispose();
-            this.triggerEvent.Dispose();
         }
 
         public void Start()
