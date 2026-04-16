@@ -21,10 +21,10 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: 10.0.x
     - name: Restore dependencies
@@ -41,14 +41,10 @@ jobs:
       contents: write
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Get main version
-      id: version
-      uses: notiz-dev/github-action-json-property@release
-      with:
-        path: version.json
-        prop_path: 'version'
+      run: echo "MAIN_VERSION=$(jq -r '.version' ../version.json)" >> $GITHUB_ENV
     - name: Get branch name from branch
       run: echo "BRANCH_NAME=$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }' | sed "s/[[:space:]_]/-/g")" >> $GITHUB_ENV
       if: startsWith(github.ref, 'refs/heads/')
@@ -57,14 +53,14 @@ jobs:
       if: startsWith(github.ref, 'refs/pull/')
       
     - run: echo Version ${BRANCH_NAME}
-    - run: echo "PACKAGE_VERSION=${{steps.version.outputs.prop}}.${GITHUB_RUN_NUMBER}" >> $GITHUB_ENV
+    - run: echo "PACKAGE_VERSION=${MAIN_VERSION}.${GITHUB_RUN_NUMBER}" >> $GITHUB_ENV
       if: github.ref == 'refs/heads/main'
-    - run: echo "PACKAGE_VERSION=${{steps.version.outputs.prop}}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}-${GITHUB_SHA::8}" >> $GITHUB_ENV
+    - run: echo "PACKAGE_VERSION=${MAIN_VERSION}.${GITHUB_RUN_NUMBER}-${BRANCH_NAME}-${GITHUB_SHA::8}" >> $GITHUB_ENV
       if: github.ref != 'refs/heads/main'
     - run: echo Version is ${PACKAGE_VERSION}
 
     - name: Setup .NET Core
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: 10.0.x
     - name: Install dependencies
