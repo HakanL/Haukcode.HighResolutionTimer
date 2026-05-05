@@ -135,14 +135,18 @@ namespace Haukcode.HighResolutionTimer
                     this.timerHandle, ref dueTime, 0,
                     IntPtr.Zero, IntPtr.Zero, false);
             }
-            
+
             if (disposing)
             {
                 GC.SuppressFinalize(this);
-            }
 
-            // Wait for the scheduler thread to exit.
-            this.thread.Join();
+                // Wait for the scheduler thread to exit during explicit disposal only.
+                // Avoid deadlocking by joining the current thread.
+                if (Thread.CurrentThread != this.thread)
+                {
+                    this.thread.Join();
+                }
+            }
         }
 
         public void Dispose()
