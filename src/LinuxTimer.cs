@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Haukcode.HighResolutionTimer
 {
@@ -11,7 +9,9 @@ namespace Haukcode.HighResolutionTimer
         private readonly int fileDescriptor;
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
         private readonly ManualResetEvent triggerEvent = new ManualResetEvent(false);
+        private readonly Thread thread;
         private bool isRunning;
+        private bool disposed;
 
         public LinuxTimer()
         {
@@ -20,7 +20,16 @@ namespace Haukcode.HighResolutionTimer
             if (this.fileDescriptor == -1)
                 throw new Exception($"Unable to create timer, errno = {Marshal.GetLastWin32Error()}");
 
-            ThreadPool.QueueUserWorkItem(Scheduler);
+            // High priority reduces wake-up latency while waiting on the native
+            // timer, improving blocking precision. Background mode keeps this
+            // helper thread from holding the process alive on application exit.
+            this.thread = new Thread(Scheduler)
+            {
+                Name = nameof(HighResolutionTimer),
+                Priority = ThreadPriority.Highest,
+                IsBackground = true
+            };
+            this.thread.Start();
         }
 
         public void WaitForTrigger()
@@ -34,7 +43,7 @@ namespace Haukcode.HighResolutionTimer
             SetFrequency((uint)(periodMS * 1_000));
         }
 
-        private void Scheduler(object state)
+        private void Scheduler()
         {
             while (!this.cts.IsCancellationRequested)
             {
@@ -90,10 +99,33 @@ namespace Haukcode.HighResolutionTimer
 
         public void Dispose()
         {
+            if (this.disposed)
+                return;
+
+            this.disposed = true;
             this.cts.Cancel();
+
+            // Arm timerfd to fire immediately, unblocking the scheduler's blocking read.
+            // CancellationToken alone does not interrupt Interop.read on the timerfd.
+            var itval = new Interop.itimerspec
+            {
+                it_interval = new Interop.timespec { tv_sec = 0, tv_nsec = 0 },
+                it_value = new Interop.timespec { tv_sec = 0, tv_nsec = 1 }
+            };
+            Interop.timerfd_settime(this.fileDescriptor, 0, itval, null);
 
             // Release trigger
             this.triggerEvent.Set();
+
+            // Wait for the scheduler thread to exit during explicit disposal only.
+            // Avoid deadlocking by joining the current thread.
+            if (Thread.CurrentThread != this.thread)
+            {
+                this.thread.Join();
+            }
+
+            this.cts.Dispose();
+            this.triggerEvent.Dispose();
         }
 
         public void Start()

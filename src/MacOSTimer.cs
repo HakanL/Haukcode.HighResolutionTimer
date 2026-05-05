@@ -9,7 +9,9 @@ namespace Haukcode.HighResolutionTimer
         private readonly int kqueueFd;
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
         private readonly ManualResetEvent triggerEvent = new ManualResetEvent(false);
+        private readonly Thread thread;
         private bool isRunning;
+        private bool disposed;
 
         private const short EVFILT_TIMER = -7;
         private const ushort EV_ADD = 0x0001;
@@ -46,7 +48,16 @@ namespace Haukcode.HighResolutionTimer
             if (this.kqueueFd == -1)
                 throw new Exception($"Unable to create kqueue, errno = {Marshal.GetLastWin32Error()}");
 
-            ThreadPool.QueueUserWorkItem(Scheduler);
+            // High priority reduces wake-up latency while waiting on the native
+            // timer, improving blocking precision. Background mode keeps this
+            // helper thread from holding the process alive on application exit.
+            this.thread = new Thread(Scheduler)
+            {
+                Name = nameof(HighResolutionTimer),
+                Priority = ThreadPriority.Highest,
+                IsBackground = true
+            };
+            this.thread.Start();
         }
 
         public void WaitForTrigger()
@@ -72,7 +83,7 @@ namespace Haukcode.HighResolutionTimer
                 throw new Exception($"Error from kevent = {Marshal.GetLastWin32Error()}");
         }
 
-        private void Scheduler(object state)
+        private void Scheduler()
         {
             while (!this.cts.IsCancellationRequested)
             {
@@ -84,16 +95,42 @@ namespace Haukcode.HighResolutionTimer
             }
 
             close(this.kqueueFd);
-            this.cts.Dispose();
-            this.triggerEvent.Dispose();
         }
 
         public void Dispose()
         {
+            if (this.disposed)
+                return;
+
+            this.disposed = true;
             this.cts.Cancel();
+
+            // Arm/replace the kqueue timer to fire immediately so the scheduler's
+            // blocking kevent_wait returns and observes cancellation. CancellationToken
+            // alone cannot interrupt the native wait.
+            var kev = new KEvent
+            {
+                ident = 1,
+                filter = EVFILT_TIMER,
+                flags = EV_ADD | EV_ENABLE,
+                fflags = NOTE_USECONDS,
+                data = 1,
+                udata = IntPtr.Zero
+            };
+            kevent(this.kqueueFd, ref kev, 1, IntPtr.Zero, 0, IntPtr.Zero);
 
             // Release trigger
             this.triggerEvent.Set();
+
+            // Wait for the scheduler thread to exit during explicit disposal only.
+            // Avoid deadlocking by joining the current thread.
+            if (Thread.CurrentThread != this.thread)
+            {
+                this.thread.Join();
+            }
+
+            this.cts.Dispose();
+            this.triggerEvent.Dispose();
         }
 
         public void Start()

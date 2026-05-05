@@ -19,6 +19,7 @@ namespace Haukcode.HighResolutionTimer
         private readonly IntPtr timerHandle;
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
         private readonly ManualResetEvent triggerEvent = new ManualResetEvent(false);
+        private readonly Thread thread;
 
         public WindowsTimer()
         {
@@ -31,8 +32,17 @@ namespace Haukcode.HighResolutionTimer
                 int error = Marshal.GetLastWin32Error();
                 throw new Win32Exception(error);
             }
-
-            ThreadPool.QueueUserWorkItem(Scheduler);
+            
+            // High priority reduces wake-up latency while waiting on the native
+            // timer, improving blocking precision. Background mode keeps this
+            // helper thread from holding the process alive on application exit.
+            this.thread = new Thread(Scheduler)
+            {
+                Name = nameof(HighResolutionTimer),
+                Priority = ThreadPriority.Highest,
+                IsBackground = true
+            };
+            this.thread.Start();
         }
 
         ~WindowsTimer()
@@ -45,7 +55,7 @@ namespace Haukcode.HighResolutionTimer
             this.periodMs = periodMS;
         }
 
-        private void Scheduler(object state)
+        private void Scheduler()
         {
             while (!this.cts.IsCancellationRequested)
             {
@@ -129,6 +139,13 @@ namespace Haukcode.HighResolutionTimer
             if (disposing)
             {
                 GC.SuppressFinalize(this);
+
+                // Wait for the scheduler thread to exit during explicit disposal only.
+                // Avoid deadlocking by joining the current thread.
+                if (Thread.CurrentThread != this.thread)
+                {
+                    this.thread.Join();
+                }
             }
         }
 
