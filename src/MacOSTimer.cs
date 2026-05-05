@@ -9,6 +9,7 @@ namespace Haukcode.HighResolutionTimer
         private readonly int kqueueFd;
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
         private readonly ManualResetEvent triggerEvent = new ManualResetEvent(false);
+        private readonly Thread thread;
         private bool isRunning;
 
         private const short EVFILT_TIMER = -7;
@@ -46,7 +47,16 @@ namespace Haukcode.HighResolutionTimer
             if (this.kqueueFd == -1)
                 throw new Exception($"Unable to create kqueue, errno = {Marshal.GetLastWin32Error()}");
 
-            ThreadPool.QueueUserWorkItem(Scheduler);
+            // High priority reduces wake-up latency while waiting on the native
+            // timer, improving blocking precision. Background mode keeps this
+            // helper thread from holding the process alive on application exit.
+            this.thread = new Thread(Scheduler)
+            {
+                Name = nameof(HighResolutionTimer),
+                Priority = ThreadPriority.Highest,
+                IsBackground = true
+            };
+            this.thread.Start();
         }
 
         public void WaitForTrigger()
@@ -72,7 +82,7 @@ namespace Haukcode.HighResolutionTimer
                 throw new Exception($"Error from kevent = {Marshal.GetLastWin32Error()}");
         }
 
-        private void Scheduler(object state)
+        private void Scheduler()
         {
             while (!this.cts.IsCancellationRequested)
             {
@@ -94,6 +104,9 @@ namespace Haukcode.HighResolutionTimer
 
             // Release trigger
             this.triggerEvent.Set();
+
+            // Wait for the scheduler thread to exit.
+            this.thread.Join();
         }
 
         public void Start()
