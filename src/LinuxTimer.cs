@@ -11,6 +11,7 @@ namespace Haukcode.HighResolutionTimer
         private readonly ManualResetEvent triggerEvent = new ManualResetEvent(false);
         private readonly Thread thread;
         private bool isRunning;
+        private bool disposed;
 
         public LinuxTimer()
         {
@@ -98,7 +99,20 @@ namespace Haukcode.HighResolutionTimer
 
         public void Dispose()
         {
+            if (this.disposed)
+                return;
+
+            this.disposed = true;
             this.cts.Cancel();
+
+            // Arm timerfd to fire immediately, unblocking the scheduler's blocking read.
+            // CancellationToken alone does not interrupt Interop.read on the timerfd.
+            var itval = new Interop.itimerspec
+            {
+                it_interval = new Interop.timespec { tv_sec = 0, tv_nsec = 0 },
+                it_value = new Interop.timespec { tv_sec = 0, tv_nsec = 1 }
+            };
+            Interop.timerfd_settime(this.fileDescriptor, 0, itval, null);
 
             // Release trigger
             this.triggerEvent.Set();
@@ -109,6 +123,9 @@ namespace Haukcode.HighResolutionTimer
             {
                 this.thread.Join();
             }
+
+            this.cts.Dispose();
+            this.triggerEvent.Dispose();
         }
 
         public void Start()
