@@ -11,6 +11,7 @@ namespace Haukcode.HighResolutionTimer
         private readonly ManualResetEvent triggerEvent = new ManualResetEvent(false);
         private readonly Thread thread;
         private bool isRunning;
+        private bool disposed;
 
         private const short EVFILT_TIMER = -7;
         private const ushort EV_ADD = 0x0001;
@@ -94,13 +95,29 @@ namespace Haukcode.HighResolutionTimer
             }
 
             close(this.kqueueFd);
-            this.cts.Dispose();
-            this.triggerEvent.Dispose();
         }
 
         public void Dispose()
         {
+            if (this.disposed)
+                return;
+
+            this.disposed = true;
             this.cts.Cancel();
+
+            // Arm/replace the kqueue timer to fire immediately so the scheduler's
+            // blocking kevent_wait returns and observes cancellation. CancellationToken
+            // alone cannot interrupt the native wait.
+            var kev = new KEvent
+            {
+                ident = 1,
+                filter = EVFILT_TIMER,
+                flags = EV_ADD | EV_ENABLE,
+                fflags = NOTE_USECONDS,
+                data = 1,
+                udata = IntPtr.Zero
+            };
+            kevent(this.kqueueFd, ref kev, 1, IntPtr.Zero, 0, IntPtr.Zero);
 
             // Release trigger
             this.triggerEvent.Set();
@@ -111,6 +128,9 @@ namespace Haukcode.HighResolutionTimer
             {
                 this.thread.Join();
             }
+
+            this.cts.Dispose();
+            this.triggerEvent.Dispose();
         }
 
         public void Start()
