@@ -22,6 +22,7 @@
     <Title>High Resolution Timer for .NET Core</Title>
     <Version>0.99.99</Version>
     <PackageReadmeFile>README_NUGET.md</PackageReadmeFile>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
