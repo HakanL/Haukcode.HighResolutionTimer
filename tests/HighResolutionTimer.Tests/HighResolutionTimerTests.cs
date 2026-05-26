@@ -1,6 +1,6 @@
-using System;
 using System.Diagnostics;
-using Haukcode.HighResolutionTimer;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit.Abstractions;
 
 namespace HighResolutionTimer.Tests
@@ -141,6 +141,46 @@ namespace HighResolutionTimer.Tests
             int maxCount = expectedCount * 4;
             Assert.True(count >= minCount && count <= maxCount,
                 $"Trigger count {count} outside tolerance [{minCount}, {maxCount}] for {periodMs}ms period over {windowMs}ms window");
+        }
+
+        [Fact]
+        public void SetPeriod_BeforeStart_FirstTriggerNotImmediate()
+        {
+            const int periodMs = 100;
+
+            using var timer = new Haukcode.HighResolutionTimer.HighResolutionTimer();
+            timer.SetPeriod(periodMs);
+
+            // Long enough that a spuriously-queued tick from SetPeriod would have surfaced.
+            Thread.Sleep(periodMs * 3);
+
+            var sw = Stopwatch.StartNew();
+            timer.Start();
+            timer.WaitForTrigger();
+            sw.Stop();
+
+            timer.Stop();
+
+            Assert.True(sw.ElapsedMilliseconds >= periodMs / 2,
+                $"First trigger fired after {sw.ElapsedMilliseconds}ms — expected ~{periodMs}ms (SetPeriod before Start must not leak an early tick)");
+        }
+
+        [Fact]
+        public async Task WaitForTrigger_CancellationToken_ThrowsOnCancel()
+        {
+            using var timer = new Haukcode.HighResolutionTimer.HighResolutionTimer();
+            timer.SetPeriod(60_000);
+            timer.Start();
+
+            using var cts = new CancellationTokenSource();
+            var task = Task.Run(() => timer.WaitForTrigger(cts.Token));
+
+            await Task.Delay(100);
+            cts.Cancel();
+
+            await Assert.ThrowsAsync<OperationCanceledException>(() => task);
+
+            timer.Stop();
         }
     }
 }
