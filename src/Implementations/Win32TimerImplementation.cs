@@ -7,18 +7,24 @@ namespace Haukcode.HighResolutionTimer.Implementations
 {
     internal sealed class Win32TimerImplementation : ITimerImplementation
     {
+        // High-resolution waitable timers (Windows 10 1803+) are not quantized to the
+        // ~15.6ms system clock tick, so short periods like 1ms are honored accurately
+        // without raising the global timer resolution via timeBeginPeriod.
+        private const uint CreateWaitableTimerHighResolution = 0x00000002;
+        private const uint TimerAllAccess = 0x1F0003;
+
         private readonly IntPtr handle;
         private TimeSpan period;
-        
+
         public Win32TimerImplementation()
         {
-            var timer = CreateWaitableTimer(IntPtr.Zero, false, IntPtr.Zero);
+            var timer = CreateWaitableTimerEx(IntPtr.Zero, IntPtr.Zero, CreateWaitableTimerHighResolution, TimerAllAccess);
 
             if (timer == IntPtr.Zero)
             {
                 ThrowWin32Exception();
             }
-            
+
             this.handle = timer;
         }
         
@@ -91,10 +97,11 @@ namespace Haukcode.HighResolutionTimer.Implementations
         }
         
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern IntPtr CreateWaitableTimer(
+        private static extern IntPtr CreateWaitableTimerEx(
             IntPtr lpTimerAttributes,
-            bool bManualReset,
-            IntPtr lpTimerName);
+            IntPtr lpTimerName,
+            uint dwFlags,
+            uint dwDesiredAccess);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool SetWaitableTimer(
