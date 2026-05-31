@@ -70,11 +70,14 @@ jobs:
     - name: Build
       run: dotnet build HighResolutionTimer.csproj --configuration Release --no-restore /p:Version="${PACKAGE_VERSION}"
 
-    ## Publish and Tag
+    ## Publish and Tag (push to main only)
     - name: Publish NuGet
-      run: dotnet nuget push bin/Release/*.nupkg --skip-duplicate --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_KEY }}
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        PACKAGE=$(find bin/Release -maxdepth 1 -type f -name '*.nupkg' ! -name '*.symbols.nupkg' | head -n 1)
+        dotnet nuget push "$PACKAGE" --skip-duplicate --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_KEY }}
     - name: Tag
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
         git tag "v${PACKAGE_VERSION}"
         git push origin "v${PACKAGE_VERSION}"
-      if: github.ref == 'refs/heads/main'
