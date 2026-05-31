@@ -1,0 +1,74 @@
+name: Publish PR NuGet Package
+
+# This trusted workflow is triggered after the "Build and Publish" workflow
+# completes for a pull_request event. Because workflow_run runs in the context
+# of the base repository, it has access to repository secrets even when the PR
+# originates from a fork.
+#
+# Security note: we rebuild from the PR head commit rather than downloading
+# artifacts produced by the untrusted PR workflow, so no untrusted binaries
+# are ever published.
+
+on:
+  workflow_run:
+    workflows: ["Build and Publish"]
+    types: [completed]
+
+defaults:
+  run:
+    working-directory: src
+
+jobs:
+  publish-pr-package:
+    name: Publish prerelease NuGet for PR
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout PR head commit
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Get main version
+        run: echo "MAIN_VERSION=$(jq -r '.version' ../version.json)" >> $GITHUB_ENV
+
+      - name: Compute prerelease package version
+        shell: bash
+        run: |
+          PR_NUMBER=$(jq -r '.workflow_run.pull_requests[0].number // empty' "$GITHUB_EVENT_PATH")
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            PR_NUMBER="UNKNOWN"
+          fi
+          RUN_NUMBER="${{ github.event.workflow_run.run_number }}"
+          SHORT_SHA="${{ github.event.workflow_run.head_sha }}"
+          SHORT_SHA="${SHORT_SHA::8}"
+          echo "PACKAGE_VERSION=${MAIN_VERSION}.${RUN_NUMBER}-PR-${PR_NUMBER}-${SHORT_SHA}" >> $GITHUB_ENV
+
+      - run: echo "Prerelease version is ${PACKAGE_VERSION}"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install dependencies
+        run: dotnet restore HighResolutionTimer.csproj /p:Configuration=Release
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+      - name: Build (produces .nupkg via GeneratePackageOnBuild)
+        run: dotnet build HighResolutionTimer.csproj --configuration Release --no-restore /p:Version="${PACKAGE_VERSION}"
+
+      - name: Publish prerelease NuGet package
+        run: |
+          PACKAGE=$(find bin/Release -maxdepth 1 -type f -name '*.nupkg' ! -name '*.symbols.nupkg' | head -n 1)
+          dotnet nuget push "$PACKAGE" \
+            --skip-duplicate \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "${{ secrets.NUGET_KEY }}"
