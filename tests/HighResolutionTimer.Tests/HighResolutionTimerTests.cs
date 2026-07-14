@@ -144,6 +144,43 @@ namespace HighResolutionTimer.Tests
         }
 
         [Fact]
+        public void SetPeriod_WhileRunning_ChangesTriggerRate()
+        {
+            using var timer = new Haukcode.HighResolutionTimer.HighResolutionTimer();
+            timer.SetPeriod(50);
+            timer.Start();
+
+            // Discard the first trigger (may include arm latency), then measure the slow rate.
+            timer.WaitForTrigger();
+            var sw = Stopwatch.StartNew();
+            for (int i = 0; i < 5; i++)
+                timer.WaitForTrigger();
+            double slowPeriodMs = sw.Elapsed.TotalMilliseconds / 5;
+
+            // Change the period while running to a much faster rate.
+            timer.SetPeriod(10);
+
+            // Let the change take effect (up to one old period) and discard the transition ticks.
+            timer.WaitForTrigger();
+            timer.WaitForTrigger();
+
+            sw.Restart();
+            for (int i = 0; i < 10; i++)
+                timer.WaitForTrigger();
+            double fastPeriodMs = sw.Elapsed.TotalMilliseconds / 10;
+
+            timer.Stop();
+
+            _output.WriteLine($"slow ~{slowPeriodMs:F1}ms, fast ~{fastPeriodMs:F1}ms");
+
+            // Regression guard for the re-arm bug: while running, the period was fixed at the value
+            // set before the first Start(), so SetPeriod() had no effect. 50ms -> 10ms is a 5x
+            // change; the tolerance stays loose for heavily loaded CI runners.
+            Assert.True(fastPeriodMs < slowPeriodMs * 0.6,
+                $"SetPeriod while running had no effect: slow ~{slowPeriodMs:F1}ms vs fast ~{fastPeriodMs:F1}ms");
+        }
+
+        [Fact]
         public void SetPeriod_BeforeStart_FirstTriggerNotImmediate()
         {
             const int periodMs = 100;

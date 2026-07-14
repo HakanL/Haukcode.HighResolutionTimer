@@ -71,6 +71,16 @@ namespace Haukcode.HighResolutionTimer
                         this.implementation.Period = this.period.Value;
                         while (this.startedSignal.IsSet)
                         {
+                            // Apply a period change requested via SetPeriod() while the timer is
+                            // running. The blocking Wait() below is not interrupted, so the new
+                            // period takes effect from the iteration after the next tick (as the
+                            // SetPeriod docs promise). Without this the running period was fixed at
+                            // the value set before the first Start() — a Stop()/SetPeriod()/Start()
+                            // re-arm silently did nothing because the loop never re-read the field.
+                            var requestedPeriod = this.period.Value;
+                            if (requestedPeriod != this.implementation.Period)
+                                this.implementation.Period = requestedPeriod;
+
                             this.implementation.Wait(cts.Token);
                             triggerEvent.Set();
                         }
