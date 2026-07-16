@@ -15,6 +15,7 @@ namespace Haukcode.HighResolutionTimer.Implementations
 
         private readonly IntPtr handle;
         private TimeSpan period;
+        private long nextDueFileTime; // absolute FILETIME (100ns units since 1601-01-01 UTC)
 
         public Win32TimerImplementation()
         {
@@ -38,17 +39,18 @@ namespace Haukcode.HighResolutionTimer.Implementations
             get => this.period;
             set
             {
-                // Convert ms to 100ns intervals; negative value = relative time from now.
-                // 1 TimeSpan tick = 100 nanoseconds, which matches the FILETIME unit.
-                // This gives sub-millisecond precision (e.g. 16.67ms = -166700 units).
-                var dueTime = -value.Ticks;
-
-                if (!SetWaitableTimer(this.handle, ref dueTime, 0, IntPtr.Zero, IntPtr.Zero, false))
-                {
-                    ThrowWin32Exception();
-                }
-                
+                // (Re)anchor the tick schedule at now + period, using ABSOLUTE due times.
+                // Wait() advances the deadline by exactly one period per tick, so wake-up
+                // and re-arm latency never accumulate into the effective period. (The
+                // previous relative one-shot re-arm added that latency on every cycle,
+                // measured as ~25.3ms for a 25ms period — 1.3% slow.)
+                // 1 TimeSpan tick = 100 nanoseconds, which matches the FILETIME unit,
+                // giving sub-millisecond precision (e.g. 16.67ms = 166700 units).
+                GetSystemTimePreciseAsFileTime(out long now);
+                this.nextDueFileTime = now + value.Ticks;
                 this.period = value;
+
+                Arm(this.nextDueFileTime);
             }
         }
 
@@ -88,7 +90,27 @@ namespace Haukcode.HighResolutionTimer.Implementations
                 }
             }
 
-            this.Period = this.period;
+            // Advance the absolute deadline by exactly one period. If we have fallen
+            // behind by a full period or more (system suspend, debugger break, clock
+            // step), re-anchor at now to avoid a burst of immediate catch-up ticks.
+            this.nextDueFileTime += this.period.Ticks;
+
+            GetSystemTimePreciseAsFileTime(out long now);
+            if (this.nextDueFileTime <= now)
+            {
+                this.nextDueFileTime = now + this.period.Ticks;
+            }
+
+            Arm(this.nextDueFileTime);
+        }
+
+        private void Arm(long dueFileTime)
+        {
+            // Positive due time = absolute FILETIME (UTC wall clock)
+            if (!SetWaitableTimer(this.handle, ref dueFileTime, 0, IntPtr.Zero, IntPtr.Zero, false))
+            {
+                ThrowWin32Exception();
+            }
         }
 
         private static void ThrowWin32Exception()
@@ -96,6 +118,9 @@ namespace Haukcode.HighResolutionTimer.Implementations
             throw new Win32Exception(Marshal.GetLastWin32Error());
         }
         
+        [DllImport("kernel32.dll")]
+        private static extern void GetSystemTimePreciseAsFileTime(out long lpSystemTimeAsFileTime);
+
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern IntPtr CreateWaitableTimerEx(
             IntPtr lpTimerAttributes,
