@@ -359,6 +359,10 @@ using (var timer = new HighResolutionTimer())
 - Ensure work in the timer loop is minimal
 - Profile your application to identify bottlenecks
 
+## Used in production
+
+This library is used in [DMX Core 100](https://dmxcore.com), a DMX lighting controller for permanent installations that runs on Windows, macOS and Linux, or on its own touchscreen hardware. There it paces the lighting output frames.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
