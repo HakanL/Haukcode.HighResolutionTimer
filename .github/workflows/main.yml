@@ -38,6 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     permissions:
+      id-token: write   # NuGet Trusted Publishing
       contents: write
 
     steps:
@@ -71,11 +72,17 @@ jobs:
       run: dotnet build HighResolutionTimer.csproj --configuration Release --no-restore /p:Version="${PACKAGE_VERSION}"
 
     ## Publish and Tag (push to main only)
+    - name: NuGet login (OIDC)
+      id: nuget-login
+      uses: NuGet/login@v1
+      with:
+        user: HakanL
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     - name: Publish NuGet
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |
         PACKAGE=$(find bin/Release -maxdepth 1 -type f -name '*.nupkg' ! -name '*.symbols.nupkg' | head -n 1)
-        dotnet nuget push "$PACKAGE" --skip-duplicate --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_KEY }}
+        dotnet nuget push "$PACKAGE" --skip-duplicate --source https://api.nuget.org/v3/index.json --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
     - name: Tag
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       run: |

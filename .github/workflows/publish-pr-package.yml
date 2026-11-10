@@ -26,6 +26,7 @@ jobs:
       github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
+      id-token: write   # NuGet Trusted Publishing
       contents: read
 
     steps:
@@ -65,10 +66,15 @@ jobs:
       - name: Build (produces .nupkg via GeneratePackageOnBuild)
         run: dotnet build HighResolutionTimer.csproj --configuration Release --no-restore /p:Version="${PACKAGE_VERSION}"
 
+      - name: NuGet login (OIDC)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: HakanL
       - name: Publish prerelease NuGet package
         run: |
           PACKAGE=$(find bin/Release -maxdepth 1 -type f -name '*.nupkg' ! -name '*.symbols.nupkg' | head -n 1)
           dotnet nuget push "$PACKAGE" \
             --skip-duplicate \
             --source https://api.nuget.org/v3/index.json \
-            --api-key "${{ secrets.NUGET_KEY }}"
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
