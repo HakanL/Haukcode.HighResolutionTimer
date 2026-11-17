@@ -56,20 +56,23 @@ namespace Haukcode.HighResolutionTimer.Implementations
 
         public void Wait(CancellationToken cancellationToken)
         {
-            const uint infinite = 0xFFFFFFFF;
             const uint waitError = 0xFFFFFFFF;
+            const uint waitTimeout = 0x00000102;
             const uint waitCancelled = 1;
-            
+
             cancellationToken.ThrowIfCancellationRequested();
-            
+
+            // The due times are absolute wall-clock times, so a backward step of the system
+            // clock (a time sync correction, typically right after a fresh install or a resume)
+            // pushes the armed deadline into the future by the size of the step, and the timer
+            // would go silent for that long. A healthy wait never takes much more than one
+            // period, so give up after two and re-anchor; the late tick is still delivered.
+            uint timeoutMS = GetWaitTimeoutMS(this.period);
+            uint result;
+
             if (!cancellationToken.CanBeCanceled)
             {
-                switch (WaitForSingleObject(this.handle, infinite))
-                {
-                    case waitError:
-                        ThrowWin32Exception();
-                        return; // never returns
-                }
+                result = WaitForSingleObject(this.handle, timeoutMS);
             }
             else
             {
@@ -79,27 +82,57 @@ namespace Haukcode.HighResolutionTimer.Implementations
                     cancellationToken.WaitHandle.SafeWaitHandle.DangerousGetHandle()
                 };
 
-                switch (WaitForMultipleObjects((uint)waitHandles.Length, waitHandles, false, infinite))
+                result = WaitForMultipleObjects((uint)waitHandles.Length, waitHandles, false, timeoutMS);
+
+                if (result == waitCancelled)
                 {
-                    case waitCancelled:
-                        throw new OperationCanceledException(cancellationToken);
-                    
-                    case waitError:
-                        ThrowWin32Exception();
-                        return; // never returns
+                    throw new OperationCanceledException(cancellationToken);
                 }
             }
 
-            // Advance the absolute deadline by exactly one period. If we have fallen
-            // behind by a full period or more (system suspend, debugger break, clock
-            // step), re-anchor at now to avoid a burst of immediate catch-up ticks.
-            this.nextDueFileTime += this.period.Ticks;
+            if (result == waitError)
+            {
+                ThrowWin32Exception();
+            }
 
             GetSystemTimePreciseAsFileTime(out long now);
-            if (this.nextDueFileTime <= now)
+
+            if (result == waitTimeout)
             {
                 this.nextDueFileTime = now + this.period.Ticks;
             }
+            else
+            {
+                // Advance the absolute deadline by exactly one period. If we have fallen
+                // behind by a full period or more (system suspend, debugger break, forward
+                // clock step), re-anchor at now to avoid a burst of immediate catch-up ticks.
+                // If the deadline is more than a period ahead, the clock stepped back while
+                // this tick was being handled; re-anchor rather than wait out the step.
+                this.nextDueFileTime += this.period.Ticks;
+
+                if (this.nextDueFileTime <= now || this.nextDueFileTime - now > this.period.Ticks)
+                {
+                    this.nextDueFileTime = now + this.period.Ticks;
+                }
+            }
+
+            Arm(this.nextDueFileTime);
+        }
+
+        internal static uint GetWaitTimeoutMS(TimeSpan period)
+        {
+            // Two periods plus a margin for scheduling latency on a loaded system. Periods are
+            // limited to 15 minutes, so this always fits and never reaches INFINITE.
+            return (uint)Math.Ceiling(period.TotalMilliseconds * 2) + 50;
+        }
+
+        /// <summary>
+        /// Test hook: moves the armed deadline later by <paramref name="step"/>, which is what
+        /// the kernel sees when the system clock steps back by that amount.
+        /// </summary>
+        internal void SimulateClockStepBack(TimeSpan step)
+        {
+            this.nextDueFileTime += step.Ticks;
 
             Arm(this.nextDueFileTime);
         }

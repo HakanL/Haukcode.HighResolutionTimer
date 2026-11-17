@@ -29,4 +29,8 @@
     <None Include="..\README_NUGET.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="HighResolutionTimer.Tests" />
+  </ItemGroup>
+
 </Project>

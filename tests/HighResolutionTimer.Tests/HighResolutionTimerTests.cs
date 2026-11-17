@@ -219,5 +219,48 @@ namespace HighResolutionTimer.Tests
 
             timer.Stop();
         }
+
+        [Fact]
+        public void Win32_ClockStepBack_KeepsTicking()
+        {
+            if (!OperatingSystem.IsWindows())
+                return;
+
+            // The Windows implementation arms absolute wall-clock deadlines. A backward clock
+            // step leaves the armed deadline that far in the future; without a bounded wait the
+            // timer went silent for the whole step (seen in the field as a hung output thread).
+            using var implementation = new Haukcode.HighResolutionTimer.Implementations.Win32TimerImplementation();
+            implementation.Period = TimeSpan.FromMilliseconds(10);
+            implementation.Wait(CancellationToken.None);
+
+            implementation.SimulateClockStepBack(TimeSpan.FromMinutes(1));
+
+            var sw = Stopwatch.StartNew();
+            implementation.Wait(CancellationToken.None);
+            long stalledWaitMs = sw.ElapsedMilliseconds;
+
+            // Re-anchored at now, so the following ticks come at the normal period again
+            sw.Restart();
+            for (int i = 0; i < 10; i++)
+                implementation.Wait(CancellationToken.None);
+            long tenTicksMs = sw.ElapsedMilliseconds;
+
+            _output.WriteLine($"Wait after step: {stalledWaitMs} ms, next 10 ticks: {tenTicksMs} ms");
+
+            Assert.True(stalledWaitMs < 1_000, $"Wait after a 1 minute clock step took {stalledWaitMs} ms");
+            Assert.True(tenTicksMs < 500, $"10 ticks at 10 ms took {tenTicksMs} ms after re-anchoring");
+        }
+
+        [Theory]
+        [InlineData(1, 52)]
+        [InlineData(16.67, 84)]
+        [InlineData(25, 100)]
+        [InlineData(15 * 60 * 1000, 1_800_050)]
+        public void Win32_WaitTimeout_IsTwoPeriodsPlusMargin(double periodMs, uint expectedMs)
+        {
+            uint timeoutMs = Haukcode.HighResolutionTimer.Implementations.Win32TimerImplementation.GetWaitTimeoutMS(TimeSpan.FromMilliseconds(periodMs));
+
+            Assert.Equal(expectedMs, timeoutMs);
+        }
     }
 }
